@@ -1,0 +1,11 @@
+# frpc.toml - frp客户端配置文件
+
+serverAddr = ""
+serverPort = 
+token = ""
+[[proxies]]
+name = ""
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 25565
+remotePort = 

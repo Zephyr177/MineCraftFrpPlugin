@@ -1,0 +1,15 @@
+name: FrpPlugin
+version: 1.0.0
+main: com.minecraft.frpplugin.FrpPlugin
+api-version: 1.18
+author: NingMeng123
+description: 一个可以运行frp项目的Bukkit插件
+commands:
+  frp:
+    description: FRP管理命令
+    usage: /frp <start|stop|restart|status|config>
+    permission: frpplugin.admin
+permissions:
+  frpplugin.admin:
+    description: 允许使用所有FrpPlugin命令
+    default: op

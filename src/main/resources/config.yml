@@ -1,0 +1,14 @@
+# FrpPlugin 配置文件
+
+# 是否在服务器启动时自动启动frpc
+auto_start: true
+
+# 是否在控制台显示frpc的详细日志
+verbose_logging: true
+
+# 下载设置
+download:
+  # 是否在启动时检查更新
+  check_update: false
+  # 下载超时时间(秒)
+  timeout: 30
