@@ -6,12 +6,18 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
+import com.minecraft.frpplugin.version.VersionAdapter;
+import com.minecraft.frpplugin.version.VersionAdapterFactory;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
+import java.lang.reflect.Field;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -30,6 +36,7 @@ public class FrpPlugin extends JavaPlugin {
     private File configFile;
     private FileConfiguration frpConfig;
     private static final String GITHUB_API_URL = "https://api.github.com/repos/fatedier/frp/releases/latest";
+    private VersionAdapter versionAdapter;
     
     /**
      * 获取frp的最新版本号
@@ -43,15 +50,15 @@ public class FrpPlugin extends JavaPlugin {
         
         try {
             version = fetchVersionFromUrl(apiUrl);
-            getLogger().info("从镜像源获取到最新版本: " + version);
+            logInfo("从镜像源获取到最新版本: " + version);
         } catch (IOException e) {
-            getLogger().warning("从镜像源获取版本失败，将尝试原始API: " + e.getMessage());
+            logWarning("从镜像源获取版本失败，将尝试原始API: " + e.getMessage());
         }
         
         // 如果从镜像源获取失败，尝试从原始API获取
         if (version == null) {
             version = fetchVersionFromUrl(GITHUB_API_URL);
-            getLogger().info("从GitHub API获取到最新版本: " + version);
+            logInfo("从GitHub API获取到最新版本: " + version);
         }
         
         return version;
@@ -84,12 +91,20 @@ public class FrpPlugin extends JavaPlugin {
         }
         
         // 如果无法解析，返回一个默认版本
-        getLogger().warning("无法从API获取最新版本，使用默认版本v0.61.2");
+        logWarning("无法从API获取最新版本，使用默认版本v0.61.2");
         return "v0.61.2";
     }
     
     @Override
     public void onEnable() {
+        // 初始化版本适配器
+        versionAdapter = VersionAdapterFactory.createAdapter(this);
+        if (!versionAdapter.isCompatible()) {
+            logWarning("当前服务器版本可能与插件不兼容，部分功能可能无法正常工作");
+        }
+        versionAdapter.initialize();
+        logInfo("使用 " + versionAdapter.getVersionName() + " 版本适配器");
+        
         // 创建插件目录
         if (!getDataFolder().exists()) {
             getDataFolder().mkdirs();
@@ -104,7 +119,22 @@ public class FrpPlugin extends JavaPlugin {
         // 注册命令执行器
         getCommand("frp").setExecutor(new FrpCommandExecutor(this, frpManager));
         
-        getLogger().info("FrpPlugin 已启用!");
+        logInfo("FrpPlugin 已启用!");
+    }
+    
+    // 添加日志输出方法，使用版本适配器处理编码
+    private void logInfo(String message) {
+        if (versionAdapter instanceof com.minecraft.frpplugin.version.Version_1_12_Adapter) {
+            message = ((com.minecraft.frpplugin.version.Version_1_12_Adapter) versionAdapter).fixEncoding(message);
+        }
+        getLogger().info(message);
+    }
+    
+    private void logWarning(String message) {
+        if (versionAdapter instanceof com.minecraft.frpplugin.version.Version_1_12_Adapter) {
+            message = ((com.minecraft.frpplugin.version.Version_1_12_Adapter) versionAdapter).fixEncoding(message);
+        }
+        getLogger().warning(message);
     }
     
     @Override
@@ -114,7 +144,7 @@ public class FrpPlugin extends JavaPlugin {
             frpManager.stopFrp();
         }
         
-        getLogger().info("FrpPlugin 已禁用!");
+        logInfo("FrpPlugin 已禁用!");
     }
     
     /**

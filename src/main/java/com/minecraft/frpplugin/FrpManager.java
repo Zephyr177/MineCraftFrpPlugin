@@ -25,6 +25,14 @@ public class FrpManager {
         this.plugin = plugin;
         this.logger = plugin.getLogger();
         this.isClientRunning = false;
+        
+        // 添加JVM关闭钩子，确保在Java进程被强制终止时也能关闭frp进程
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (isClientRunning && frpcProcess != null) {
+                logger.info("检测到JVM关闭，正在停止frpc进程...");
+                stopFrpClient();
+            }
+        }));
     }
     
     /**
@@ -116,17 +124,41 @@ public class FrpManager {
      */
     public void stopFrpClient() {
         if (frpcProcess != null && isClientRunning) {
-            frpcProcess.destroy();
             try {
-                // 等待进程结束，最多等待5秒
-                if (!frpcProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) {
-                    // 如果5秒后进程仍未结束，强制终止
+                // 先尝试正常终止进程
+                frpcProcess.destroy();
+                
+                // 等待进程结束，最多等待3秒
+                if (!frpcProcess.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) {
+                    // 如果3秒后进程仍未结束，强制终止
+                    logger.info("frpc进程未在预期时间内终止，正在强制终止...");
                     frpcProcess.destroyForcibly();
+                    
+                    // 再等待2秒确保进程被终止
+                    if (!frpcProcess.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) {
+                        logger.warning("无法完全终止frpc进程，可能需要手动清理");
+                    }
                 }
+                
+                // 获取进程ID并尝试使用系统命令终止（仅Windows系统）
+                String osName = System.getProperty("os.name").toLowerCase();
+                if (osName.contains("win")) {
+                    try {
+                        // 使用taskkill命令强制终止所有frpc.exe进程
+                        ProcessBuilder pb = new ProcessBuilder("taskkill", "/F", "/IM", "frpc.exe");
+                        pb.start();
+                        logger.info("已执行系统命令终止所有frpc.exe进程");
+                    } catch (Exception e) {
+                        logger.log(Level.WARNING, "使用系统命令终止frpc进程时出错", e);
+                    }
+                }
+                
                 isClientRunning = false;
                 logger.info("frpc已停止");
             } catch (InterruptedException e) {
                 logger.log(Level.SEVERE, "停止frpc时出错", e);
+                // 即使出现异常，也标记为已停止，避免状态不一致
+                isClientRunning = false;
             }
         }
     }
