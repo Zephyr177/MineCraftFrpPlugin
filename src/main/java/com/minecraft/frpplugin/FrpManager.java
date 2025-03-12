@@ -82,7 +82,7 @@ public class FrpManager {
             }
             
             if (hasAutoTLS) {
-                logger.info("检测到autoTLS配置项，正在移除...");
+                logger.info("检测到为openfrp的配置文件，已自动去除autoTLS配置");
                 StringBuilder newConfig = new StringBuilder();
                 for (String line : configContent.split("\n")) {
                     if (!line.trim().startsWith("autoTLS")) {
@@ -90,7 +90,6 @@ public class FrpManager {
                     }
                 }
                 java.nio.file.Files.writeString(configFile.toPath(), newConfig.toString());
-                logger.info("已移除autoTLS配置项");
             }
             ProcessBuilder pb = new ProcessBuilder(
                 frpcFile.getAbsolutePath(),
