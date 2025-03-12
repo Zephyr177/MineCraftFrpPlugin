@@ -4,6 +4,7 @@ import org.bukkit.plugin.Plugin;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -16,6 +17,7 @@ public class FrpManager {
     private final Logger logger;
     private Process frpcProcess;
     private boolean isClientRunning;
+    private ProcessManager processManager;
     
     /**
      * 构造函数
@@ -25,8 +27,11 @@ public class FrpManager {
         this.plugin = plugin;
         this.logger = plugin.getLogger();
         this.isClientRunning = false;
+        this.processManager = new ProcessManager(plugin.getDataFolder(), logger);
         
-        // 添加JVM关闭钩子，确保在Java进程被强制终止时也能关闭frp进程
+        // 检查是否有未正常关闭的frpc进程
+        checkExistingProcess();
+        
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             if (isClientRunning && frpcProcess != null) {
                 logger.info("检测到JVM关闭，正在停止frpc进程...");
@@ -95,12 +100,23 @@ public class FrpManager {
                     int exitCode = frpcProcess.waitFor();
                     isClientRunning = false;
                     logger.info("frpc进程已退出，退出码: " + exitCode);
+                    // 清除PID记录
+                    processManager.clearProcessPid("frpc");
                 } catch (InterruptedException e) {
                     logger.log(Level.SEVERE, "监控frpc进程时出错", e);
                 }
             }).start();
             
             isClientRunning = true;
+            
+            // 记录进程PID
+            try {
+                long pid = getPid(frpcProcess);
+                processManager.recordProcessPid("frpc", pid);
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "获取进程PID时出错", e);
+            }
+            
             logger.info("frpc已成功启动");
             return true;
             
@@ -117,6 +133,22 @@ public class FrpManager {
      */
     public void stopFrp() {
         stopFrpClient();
+    }
+
+    /**
+     * 处理进程关闭命令
+     * @param pid 进程ID
+     * @return 是否成功关闭进程
+     */
+    public boolean handleKillProcessCommand(long pid) {
+        // 验证PID是否匹配
+        if (processManager.checkProcess("frpc") == pid) {
+            logger.info("正在通过命令关闭frpc进程(PID: " + pid + ")");
+            return processManager.killProcess("frpc", pid);
+        } else {
+            logger.warning("指定的PID与当前记录的frpc进程不匹配");
+            return false;
+        }
     }
     
     /**
@@ -154,6 +186,8 @@ public class FrpManager {
                 }
                 
                 isClientRunning = false;
+                // 清除PID记录
+                processManager.clearProcessPid("frpc");
                 logger.info("frpc已停止");
             } catch (InterruptedException e) {
                 logger.log(Level.SEVERE, "停止frpc时出错", e);
@@ -206,6 +240,63 @@ public class FrpManager {
             return baseName + ".exe";
         } else {
             return baseName;
+        }
+    }
+    
+    /**
+     * 检查是否有未正常关闭的frpc进程
+     */
+    private void checkExistingProcess() {
+        long pid = processManager.checkProcess("frpc");
+        if (pid > 0) {
+            logger.warning("检测到未正常关闭的frpc进程(PID: " + pid + ")");
+            // 使用Bukkit的调度器在主线程中运行，因为涉及到玩家交互
+            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                // 获取所有在线玩家
+                plugin.getServer().getOnlinePlayers().forEach(player -> {
+                    if (player.hasPermission("frpplugin.admin")) {
+                        // 向有权限的玩家发送消息和交互按钮
+                        player.sendMessage("§c[FrpPlugin] 检测到未正常关闭的frpc进程(PID: " + pid + ")，是否关闭？");
+                        net.md_5.bungee.api.chat.TextComponent message = new net.md_5.bungee.api.chat.TextComponent("§a[关闭进程] ");
+                        message.setClickEvent(new net.md_5.bungee.api.chat.ClickEvent(
+                            net.md_5.bungee.api.chat.ClickEvent.Action.RUN_COMMAND,
+                            "/frp killprocess " + pid
+                        ));
+                        message.setHoverEvent(new net.md_5.bungee.api.chat.HoverEvent(
+                            net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
+                            new net.md_5.bungee.api.chat.ComponentBuilder("点击关闭进程").create()
+                        ));
+                        player.spigot().sendMessage(message);
+                    }
+                });
+            });
+            // 设置一个延迟任务，如果30秒内没有人处理，则自动关闭进程
+            plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+                if (processManager.checkProcess("frpc") == pid) {
+                    logger.warning("30秒内没有管理员处理进程，将自动关闭进程");
+                    if (processManager.killProcess("frpc", pid)) {
+                        logger.info("成功关闭了之前未正常退出的frpc进程");
+                    } else {
+                        logger.warning("无法关闭之前的frpc进程，可能需要手动终止");
+                    }
+                }
+            }, 600L); // 30秒 = 20 ticks/s * 30s = 600 ticks
+        }
+    }
+    
+    /**
+     * 获取进程的PID
+     * @param process 进程对象
+     * @return 进程ID
+     * @throws Exception 如果获取失败
+     */
+    private long getPid(Process process) {
+        try {
+            // 使用Java 9引入的pid()方法
+            return process.pid();
+        } catch (Exception e) {
+            logger.warning("获取进程PID时出错: " + e.getMessage());
+            return -1;
         }
     }
 }

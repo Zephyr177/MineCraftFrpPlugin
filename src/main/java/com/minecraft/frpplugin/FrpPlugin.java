@@ -1,10 +1,7 @@
 package com.minecraft.frpplugin;
 
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
 
 import com.minecraft.frpplugin.version.VersionAdapter;
 import com.minecraft.frpplugin.version.VersionAdapterFactory;
@@ -13,14 +10,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PrintStream;
-import java.lang.reflect.Field;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.charset.Charset;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.Enumeration;
 import java.util.logging.Level;
@@ -310,7 +302,7 @@ public class FrpPlugin extends JavaPlugin {
         String frpcName = System.getProperty("os.name").toLowerCase().contains("win") ? "frpc.exe" : "frpc";
         File frpcFile = new File(getDataFolder(), frpcName);
         
-        try (ZipFile zip = new ZipFile(zipFile)) {
+        try (ZipFile zip = new ZipFile(zipFile, ZipFile.OPEN_READ)) {
             Enumeration<? extends ZipEntry> entries = zip.entries();
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();

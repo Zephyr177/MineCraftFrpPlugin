@@ -1,5 +1,5 @@
 name: FrpPlugin
-version: 1.0.0
+version: 1.1.0
 main: com.minecraft.frpplugin.FrpPlugin
 api-version: 1.18
 author: NingMeng123
