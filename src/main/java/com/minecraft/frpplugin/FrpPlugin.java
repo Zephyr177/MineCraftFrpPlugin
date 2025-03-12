@@ -111,6 +111,12 @@ public class FrpPlugin extends JavaPlugin {
         // 注册命令执行器
         getCommand("frp").setExecutor(new FrpCommandExecutor(this, frpManager));
         
+        // 检查是否需要自动启动frpc
+        if (getConfig().getBoolean("auto_start", true)) {
+            logInfo("根据配置自动启动frpc客户端...");
+            frpManager.startFrpClient();
+        }
+        
         logInfo("FrpPlugin 已启用!");
     }
     

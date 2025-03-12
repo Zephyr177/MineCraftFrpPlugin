@@ -65,20 +65,40 @@ public class FrpManager {
                 return false;
             }
             
-            // 构建命令
+            // 读取并处理配置文件
+            String configContent = java.nio.file.Files.readString(configFile.toPath());
+            com.moandjiezana.toml.Toml toml = new com.moandjiezana.toml.Toml().read(configContent);
+            
+            // 对openfrp进行特殊处理,以到达兼容
+            java.util.List<java.util.Map<String, Object>> proxies = toml.getList("proxies");
+            boolean hasAutoTLS = false;
+            if (proxies != null && !proxies.isEmpty()) {
+                for (java.util.Map<String, Object> proxy : proxies) {
+                    if (proxy.containsKey("autoTLS")) {
+                        hasAutoTLS = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (hasAutoTLS) {
+                logger.info("检测到autoTLS配置项，正在移除...");
+                StringBuilder newConfig = new StringBuilder();
+                for (String line : configContent.split("\n")) {
+                    if (!line.trim().startsWith("autoTLS")) {
+                        newConfig.append(line).append("\n");
+                    }
+                }
+                java.nio.file.Files.writeString(configFile.toPath(), newConfig.toString());
+                logger.info("已移除autoTLS配置项");
+            }
             ProcessBuilder pb = new ProcessBuilder(
                 frpcFile.getAbsolutePath(),
                 "-c",
                 configFile.getAbsolutePath()
             );
-            
-            // 设置工作目录
             pb.directory(plugin.getDataFolder());
-            
-            // 重定向错误流
             pb.redirectErrorStream(true);
-            
-            // 启动进程
             frpcProcess = pb.start();
             
             // 创建日志线程
@@ -118,6 +138,19 @@ public class FrpManager {
             }
             
             logger.info("frpc已成功启动");
+            
+            // 读取并显示公网地址信息
+            try {
+                // 重用之前读取的配置内容
+                String serverAddr = toml.getString("serverAddr");
+                Long remotePort = toml.getLong("proxies[0].remotePort");
+                if (serverAddr != null && remotePort != null) {
+                    logger.info("您的公网地址为: " + serverAddr + ":" + remotePort);
+                }
+            } catch (Exception e) {
+                logger.warning("读取配置文件获取公网地址信息时出错: " + e.getMessage());
+            }
+            
             return true;
             
         } catch (IOException e) {
