@@ -44,4 +44,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Package # 构建产物的名称
-          path: build/libs  # 要上传的文件路径 (根据你的项目调整)
+          path: target/*.jar  # 要上传的文件路径 (根据你的项目调整)
