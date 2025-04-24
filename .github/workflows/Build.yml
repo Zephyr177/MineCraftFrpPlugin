@@ -1,0 +1,47 @@
+# Workflow 名称
+name: Java CI with Maven on Commit
+
+# 触发器：当有 commit 推送到 main 或 master 分支时触发
+on:
+  push:
+    branches: [ main, master ] # 你可以根据你的主分支名称修改这里
+
+# 定义一个或多个 job
+jobs:
+  # Job ID (可以自定义)
+  build:
+    # Job 名称 (显示在 GitHub Actions UI 中)
+    name: Build Java Project with Maven
+
+    # 指定运行 Job 的环境 (使用最新的 Ubuntu Runner)
+    runs-on: ubuntu-latest
+
+    # Job 中的步骤 (按顺序执行)
+    steps:
+      # 第一步：检出代码
+      # 使用官方的 checkout action 来获取仓库代码
+      - name: Checkout code
+        uses: actions/checkout@v4 # 建议使用明确的版本号
+
+      # 第二步：设置 JDK
+      # 使用官方的 setup-java action 来安装指定版本的 Java
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'        # 指定你项目需要的 Java 版本 (例如 8, 11, 17)
+          distribution: 'temurin'  # 指定 JDK 发行版 (例如 'temurin', 'zulu', 'adopt')
+          cache: 'maven'           # 启用 Maven 依赖项缓存以加快构建速度
+
+      # 第三步：使用 Maven 构建项目
+      # 运行 Maven 命令。 '-B' 表示批处理模式 (非交互式)
+      # 'package' 是一个常用的生命周期阶段，它会编译、测试并打包项目 (通常是 JAR 或 WAR)
+      - name: Build with Maven
+        run: mvn -B package --file pom.xml # 确认你的 pom.xml 文件在项目根目录
+
+      # (可选) 第四步：上传构建产物 (例如 JAR 文件)
+      # 如果你需要保存构建生成的 JAR/WAR 文件，可以使用 upload-artifact action
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Package # 构建产物的名称
+          path: build/libs  # 要上传的文件路径 (根据你的项目调整)
